@@ -234,7 +234,7 @@ func (r *Repo) hashWorktreeFile(rel string) (IndexEntry, error) {
 	if err != nil {
 		return IndexEntry{}, err
 	}
-	if int64(len(data)) >= maxFileBytes {
+	if int64(len(data)) > maxFileBytes {
 		return IndexEntry{}, fmt.Errorf("%w: file exceeds 2MB", ErrValidation)
 	}
 	st, err := os.Stat(abs)
