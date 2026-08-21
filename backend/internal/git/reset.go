@@ -72,11 +72,7 @@ func (r *Repo) RestoreWorktree(paths []string) error {
 	if err != nil {
 		return err
 	}
-	start := 0
-	if len(paths) > 1 {
-		start = 1
-	}
-	for _, p := range paths[start:] {
+	for _, p := range paths {
 		rel, err := normalizeRel(p)
 		if err != nil {
 			return err
