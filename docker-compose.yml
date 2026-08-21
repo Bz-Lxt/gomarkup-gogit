@@ -1,0 +1,38 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "41783:8080"
+    environment:
+      - TZ=Asia/Shanghai
+      - GOGIT_REPO=/data/repo
+      - GOGIT_HASH_ALGO=sha1
+      - LOG_LEVEL=info
+      - PORT=8080
+    volumes:
+      - gogit-data:/data/repo
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/api/v1/health >/dev/null || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 8s
+
+  qa:
+    image: python:3.12-alpine
+    profiles: ["qa"]
+    working_dir: /tests
+    volumes:
+      - ./tests:/tests:ro
+    environment:
+      - TZ=Asia/Shanghai
+      - GOGIT_BASE_URL=http://app:8080
+    depends_on:
+      app:
+        condition: service_healthy
+    command: ["sh", "-c", "pip install -q pytest requests && pytest -p no:cacheprovider -q"]
+
+volumes:
+  gogit-data:
