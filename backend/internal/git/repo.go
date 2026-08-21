@@ -255,9 +255,6 @@ func (r *Repo) hashWorktreeFile(rel string) (IndexEntry, error) {
 }
 
 func (r *Repo) Commit(message, author string) (Commit, error) {
-	if r.MergeInProgress() {
-		defer r.clearMergeState()
-	}
 	message = strings.TrimSpace(message)
 	author = strings.TrimSpace(author)
 	if message == "" {
@@ -314,6 +311,10 @@ func (r *Repo) Commit(message, author string) (Commit, error) {
 	if err != nil {
 		return Commit{}, err
 	}
+	// Only clear merge state once the commit is fully persisted so that a
+	// validation failure (e.g. empty message) does not abort an in-progress
+	// merge; the user can correct the input and retry the same merge commit.
+	r.clearMergeState()
 	if r.log != nil {
 		r.log.Info("commit created", "hash", oid, "branch", br)
 	}
