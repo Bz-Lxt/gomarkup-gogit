@@ -63,21 +63,25 @@ func (e TreeEntry) IsTree() bool {
 }
 
 func EncodeTree(entries []TreeEntry, algo Algo) ([]byte, error) {
-	cp := entries
-	for i := range cp {
-		if strings.TrimSpace(cp[i].Name) == "" || strings.ContainsAny(cp[i].Name, "/\x00") {
+	// Build an independent, normalized copy so the caller's slice (which may be
+	// cached for later audit/retry) is never mutated.
+	cp := make([]TreeEntry, len(entries))
+	for i := range entries {
+		e := entries[i]
+		if strings.TrimSpace(e.Name) == "" || strings.ContainsAny(e.Name, "/\x00") {
 			return nil, fmt.Errorf("%w: invalid tree entry name", ErrValidation)
 		}
-		if cp[i].IsTree() {
-			cp[i].Mode = "40000"
-			cp[i].Type = TypeTree
-		} else if cp[i].Mode == "" {
-			cp[i].Mode = "100644"
-			cp[i].Type = TypeBlob
+		if e.IsTree() {
+			e.Mode = "40000"
+			e.Type = TypeTree
+		} else if e.Mode == "" {
+			e.Mode = "100644"
+			e.Type = TypeBlob
 		}
-		if _, err := algo.DecodeOID(cp[i].OID); err != nil {
+		if _, err := algo.DecodeOID(e.OID); err != nil {
 			return nil, err
 		}
+		cp[i] = e
 	}
 	sortTree(cp)
 	var buf bytes.Buffer
