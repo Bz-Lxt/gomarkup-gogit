@@ -1,0 +1,35 @@
+# Alkaid SOP (local protocol marker)
+.alkaid-sop
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Go
+backend/bin/
+backend/coverage.out
+backend/coverage.html
+*.test
+*.out
+vendor/
+
+# Node / frontend
+frontend-user/node_modules/
+frontend-user/dist/
+frontend-user/.vite/
+
+# Python tests
+tests/.pytest_cache/
+tests/__pycache__/
+*.pyc
+
+# Runtime repo data (container volume)
+data/
+*.log
+
+# Env
+.env
+.env.local
