@@ -41,12 +41,30 @@ func (s *Store) Write(typ ObjectType, content []byte) (string, error) {
 	if err := zw.Close(); err != nil {
 		return "", fmt.Errorf("zlib close: %w", err)
 	}
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, buf.Bytes(), 0o644); err != nil {
+	// Use a unique temp file per call.  Concurrent callers may produce
+	// the same object (same content → same OID → same destination path);
+	// a fixed ".tmp" suffix would cause them to clobber each other's temp
+	// file and fail with "no such file or directory" on rename.
+	tmp, err := os.CreateTemp(filepath.Dir(path), "*.tmp")
+	if err != nil {
+		return "", fmt.Errorf("create temp object: %w", err)
+	}
+	tmpName := tmp.Name()
+	defer os.Remove(tmpName) // best-effort: no-op after a successful rename
+	if _, err := tmp.Write(buf.Bytes()); err != nil {
+		_ = tmp.Close()
 		return "", fmt.Errorf("write object: %w", err)
 	}
-	if err := os.Rename(tmp, path); err != nil {
-		_ = os.Remove(tmp)
+	if err := tmp.Close(); err != nil {
+		return "", fmt.Errorf("close temp object: %w", err)
+	}
+	if err := os.Rename(tmpName, path); err != nil {
+		// Another writer may have created the object already (e.g. on
+		// platforms where rename does not atomically replace).  If the
+		// object now exists, treat that as success.
+		if _, statErr := os.Stat(path); statErr == nil {
+			return oid, nil
+		}
 		return "", fmt.Errorf("rename object: %w", err)
 	}
 	return oid, nil
