@@ -19,10 +19,11 @@ func (r *Repo) RevParse(q string) (string, string, error) {
 	}
 	if strings.HasPrefix(q, "refs/heads/") {
 		name := strings.TrimPrefix(q, "refs/heads/")
-		if oid, err := r.ResolveBranch(name); err == nil {
-			return oid, "commit", nil
+		oid, err := r.ResolveBranch(name)
+		if err != nil {
+			return "", "", err
 		}
-		q = name
+		return oid, "commit", nil
 	}
 	if oid, err := r.ResolveBranch(q); err == nil {
 		return oid, "commit", nil
