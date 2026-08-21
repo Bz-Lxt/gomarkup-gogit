@@ -165,9 +165,13 @@ func (r *Repo) Add(paths []string) ([]IndexEntry, error) {
 			return nil, err
 		}
 		added = append(added, entries...)
-		if err := SaveIndex(r.indexPath(), idx); err != nil {
-			return nil, err
-		}
+	}
+	// Persist the index only after every path has been staged
+	// successfully.  If any path fails we return early and the
+	// on-disk index is left untouched, so a partially-applied
+	// batch never leaks into a subsequent request.
+	if err := SaveIndex(r.indexPath(), idx); err != nil {
+		return nil, err
 	}
 	return added, nil
 }
