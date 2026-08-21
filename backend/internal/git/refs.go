@@ -28,8 +28,13 @@ func validateBranchName(name string) error {
 	if strings.Contains(name, "//") {
 		return fmt.Errorf("%w: invalid branch name", ErrValidation)
 	}
+	// Reject single-dot path segments: filepath.Join cleans these away, which
+	// would otherwise let "feature/./login" collide with "feature/login".
+	if strings.Contains(name, "/.") || strings.Contains(name, "./") {
+		return fmt.Errorf("%w: invalid branch name", ErrValidation)
+	}
 	for _, r := range name {
-		if unicode.IsLetter(r) || unicode.IsDigit(r) || r == '.' || r == '_' || r == '-' {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) || r == '.' || r == '_' || r == '-' || r == '/' {
 			continue
 		}
 		return fmt.Errorf("%w: branch name has illegal character", ErrValidation)
