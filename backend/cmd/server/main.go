@@ -47,10 +47,49 @@ func main() {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
-	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
-	defer cancel()
-	_ = httpSrv.Shutdown(context.WithoutCancel(ctx))
+	shutdownServer(httpSrv, log, shutdownTimeout())
 	log.Info("gogit stopped")
+}
+
+// shutdownTimeout returns the graceful-shutdown grace window. It can be
+// overridden with GOGIT_SHUTDOWN_TIMEOUT (e.g. "15s") and defaults to
+// 8 seconds, which fits the typical container graceful-stop window.
+func shutdownTimeout() time.Duration {
+	d := 8 * time.Second
+	if v := os.Getenv("GOGIT_SHUTDOWN_TIMEOUT"); v != "" {
+		if parsed, err := time.ParseDuration(v); err == nil && parsed > 0 {
+			d = parsed
+		}
+	}
+	return d
+}
+
+// shutdownServer performs a bounded graceful shutdown of httpSrv.
+//
+// The grace window is enforced even when there are connections stuck in
+// the active state (e.g. a client that started an upload and then
+// stalled, never completing the request body). http.Server.Shutdown only
+// closes idle connections and waits indefinitely for active ones to
+// return to idle; if the deadline were stripped — as it was previously
+// via context.WithoutCancel — Shutdown would poll forever and the
+// process would only ever be killed by SIGKILL after the container's
+// stop grace period elapsed.
+//
+// Here Shutdown is given the real (deadline-bearing) context. When the
+// grace window expires, Shutdown returns context.DeadlineExceeded and
+// httpSrv.Close force-closes any still-active connections so the
+// process can exit promptly.
+func shutdownServer(httpSrv *http.Server, log *logger.Logger, grace time.Duration) {
+	ctx, cancel := context.WithTimeout(context.Background(), grace)
+	defer cancel()
+	start := time.Now()
+	err := httpSrv.Shutdown(ctx)
+	if err != nil {
+		log.Warn("graceful shutdown timed out, forcing close", "err", err, "elapsed", time.Since(start).String(), "grace", grace.String())
+		_ = httpSrv.Close()
+		return
+	}
+	log.Info("graceful shutdown complete", "elapsed", time.Since(start).String())
 }
 
 func env(k, def string) string {
