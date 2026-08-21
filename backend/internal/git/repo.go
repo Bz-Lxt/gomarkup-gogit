@@ -466,7 +466,7 @@ func (r *Repo) Log(branch string, limit int) ([]Commit, error) {
 	seen := map[string]bool{}
 	var out []Commit
 	queue := []string{oid}
-	for len(queue) > 0 && len(out) < limit-1 {
+	for len(queue) > 0 && len(out) < limit {
 		cur := queue[0]
 		queue = queue[1:]
 		if seen[cur] {
