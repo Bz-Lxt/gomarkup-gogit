@@ -1,0 +1,10 @@
+.git
+.alkaid-sop
+docs
+**/.DS_Store
+frontend-user/node_modules
+frontend-user/dist
+backend/bin
+**/*.test
+data
+tests/.pytest_cache
