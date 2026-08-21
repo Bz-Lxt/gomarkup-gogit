@@ -591,8 +591,48 @@ func (r *Repo) Checkout(name string) error {
 		return err
 	}
 	im := idx.Map()
-	// refuse if a tracked file differs from HEAD and would be overwritten
+	// refuse if any tracked file has uncommitted changes that would be
+	// overwritten or removed by switching to the target branch.
 	for p, te := range targetTree {
+		abs, err := r.abs(p)
+		if err != nil {
+			return err
+		}
+		if _, err := os.Stat(abs); err != nil {
+			continue // file absent in worktree; checkout will create it
+		}
+		wt, err := r.hashWorktreeFile(p)
+		if err != nil {
+			return err
+		}
+		// already at target content — nothing to change, safe
+		if wt.OID == te.OID {
+			continue
+		}
+		headOID := ""
+		if ce, ok := currentTree[p]; ok {
+			headOID = ce.OID
+		}
+		indexOID := ""
+		if ie, ok := im[p]; ok {
+			indexOID = ie.OID
+		}
+		// uncommitted: worktree differs from index (unstaged) or index
+		// differs from HEAD (staged). Either way refuse to overwrite.
+		if wt.OID != indexOID || (indexOID != "" && indexOID != headOID) {
+			return fmt.Errorf("%w: %s", ErrDirtyWorktree, p)
+		}
+		// tracked only in worktree/index, not in HEAD — also uncommitted
+		if headOID == "" && (indexOID != "" || fileExists(abs)) {
+			return fmt.Errorf("%w: %s", ErrDirtyWorktree, p)
+		}
+	}
+	// files present in current HEAD but absent in target would be removed;
+	// refuse if any of those carry uncommitted changes too.
+	for p := range currentTree {
+		if _, keep := targetTree[p]; keep {
+			continue
+		}
 		abs, err := r.abs(p)
 		if err != nil {
 			return err
@@ -604,20 +644,12 @@ func (r *Repo) Checkout(name string) error {
 		if err != nil {
 			return err
 		}
-		headOID := ""
-		if ce, ok := currentTree[p]; ok {
-			headOID = ce.OID
-		}
 		indexOID := ""
 		if ie, ok := im[p]; ok {
 			indexOID = ie.OID
 		}
-		dirty := (indexOID != "" && indexOID != headOID) || (headOID == "" && (indexOID != "" || fileExists(abs)))
-		if dirty && te.OID != wt.OID {
-			// allow if worktree already matches target
-			if wt.OID != te.OID {
-				return fmt.Errorf("%w: %s", ErrDirtyWorktree, p)
-			}
+		if wt.OID != indexOID || (indexOID != "" && indexOID != currentTree[p].OID) {
+			return fmt.Errorf("%w: %s", ErrDirtyWorktree, p)
 		}
 	}
 	// restore target snapshot
