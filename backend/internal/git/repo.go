@@ -186,7 +186,7 @@ func (r *Repo) addPath(idx *Index, rel string) ([]IndexEntry, error) {
 	}
 	if st.IsDir() {
 		var out []IndexEntry
-		_ = filepath.WalkDir(abs, func(p string, d os.DirEntry, err error) error {
+		err = filepath.WalkDir(abs, func(p string, d os.DirEntry, err error) error {
 			if err != nil {
 				return err
 			}
@@ -215,6 +215,9 @@ func (r *Repo) addPath(idx *Index, rel string) ([]IndexEntry, error) {
 			out = append(out, e)
 			return nil
 		})
+		if err != nil {
+			return nil, err
+		}
 		return out, nil
 	}
 	e, err := r.hashWorktreeFile(rel)
@@ -232,7 +235,10 @@ func (r *Repo) hashWorktreeFile(rel string) (IndexEntry, error) {
 	}
 	data, err := os.ReadFile(abs)
 	if err != nil {
-		return IndexEntry{}, err
+		if os.IsNotExist(err) {
+			return IndexEntry{}, fmt.Errorf("%w: %s (broken link or missing target)", ErrNotFound, rel)
+		}
+		return IndexEntry{}, fmt.Errorf("cannot read %s: %w", rel, err)
 	}
 	if int64(len(data)) > maxFileBytes {
 		return IndexEntry{}, fmt.Errorf("%w: file exceeds 2MB", ErrValidation)
