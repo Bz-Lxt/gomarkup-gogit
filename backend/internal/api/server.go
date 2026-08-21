@@ -334,7 +334,11 @@ func (s *Server) merge(w http.ResponseWriter, r *http.Request) {
 	res, err := s.repo.Merge(req.Branch)
 	if err != nil {
 		if errors.Is(err, git.ErrMergeConflict) {
-			s.log.Warn("merge requires resolution", "branch", req.Branch, "commit", res.Commit.Hash, "conflicts", len(res.Conflicts))
+			commitHash := ""
+			if res.Commit != nil {
+				commitHash = res.Commit.Hash
+			}
+			s.log.Warn("merge requires resolution", "branch", req.Branch, "commit", commitHash, "conflicts", len(res.Conflicts))
 			writeJSON(w, http.StatusConflict, envelope{
 				Error: &eBody{Code: "conflict", Message: "merge produced conflicts", Details: res.Conflicts},
 			})
